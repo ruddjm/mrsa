@@ -1,0 +1,779 @@
+%\documentclass{article}
+\documentclass[10pt]{beamer}
+%\usepackage[T1]{fontenc}
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{3}
+\usepackage{url}
+\ifx\hypersetup\undefined
+  \AtBeginDocument{%
+    \hypersetup{unicode=true,pdfusetitle,
+ bookmarks=true,bookmarksnumbered=false,bookmarksopen=false,
+ breaklinks=false,pdfborder={0 0 0},pdfborderstyle={},backref=false,colorlinks=false}
+  }
+\else
+  \hypersetup{unicode=true,pdfusetitle,
+ bookmarks=true,bookmarksnumbered=false,bookmarksopen=false,
+ breaklinks=false,pdfborder={0 0 0},pdfborderstyle={},backref=false,colorlinks=false}
+\fi
+\usepackage{breakurl}
+
+\makeatletter
+
+% Slide numbers
+\defbeamertemplate*{footline}{shadow theme}
+{%
+  \leavevmode%
+  \hbox{\begin{beamercolorbox}[wd=.5\paperwidth,ht=2.5ex,dp=1.125ex,leftskip=.3cm plus1fil,rightskip=.3cm]{author in head/foot}%
+    \usebeamerfont{author in head/foot}\insertframenumber\,/\,\inserttotalframenumber\hfill\insertshortauthor
+  \end{beamercolorbox}%
+  \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.5ex,dp=1.125ex,leftskip=.3cm,rightskip=.3cm plus1fil]{title in head/foot}%
+    \usebeamerfont{title in head/foot}\insertshorttitle%
+  \end{beamercolorbox}}%
+  \vskip0pt%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% LyX specific LaTeX commands.
+\providecommand{\LyX}{\texorpdfstring%
+  {L\kern-.1667em\lower.25em\hbox{Y}\kern-.125emX\@}
+  {LyX}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Textclass specific LaTeX commands.
+ % this default might be overridden by plain title style
+ \newcommand\makebeamertitle{\frame{\maketitle}}%
+ % (ERT) argument for the TOC
+ \AtBeginDocument{%
+   \let\origtableofcontents=\tableofcontents
+   \def\tableofcontents{\@ifnextchar[{\origtableofcontents}{\gobbletableofcontents}}
+   \def\gobbletableofcontents#1{\origtableofcontents}
+ }
+
+\makeatother
+   
+\usetheme{Warsaw}
+%\usefonttheme[onlymath]{serif}
+%\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{} % Turn off navigation symbols
+\setbeamertemplate{items}[ball, shadow=true]
+
+\if0
+\usepackage{setspace,relsize,booktabs}                % for latex(describe()) (Hmisc package) and latex.table
+\usepackage{longtable}                                % for tables that break over multiple pages
+\usepackage[pdftex]{lscape}
+%\usepackage[margin=1in,bottom=.5in,includehead,includefoot]{geometry}       % sets 1-inch margins
+\usepackage{amssymb,amsmath,bm,amsthm}                       % math formatting
+\usepackage{graphicx,epsfig,topcapt,colortbl,color,subfigure}   % colors and figures
+\usepackage{enumerate,array}
+
+\usepackage{hyperref}
+\hypersetup{
+   linkcolor=blue,
+   colorlinks=true,       % false: boxed links; true: colored links
+}
+
+%\usepackage{alltt}
+%\usepackage{amsfonts}
+%\usepackage{fancyheadings, vmargin, caption2}
+%\usepackage{epsf, epic}
+%\usepackage[dvipsnames]{xcolor}
+
+%\usepackage{fancyhdr}
+%\pagestyle{plain}
+%\fancyhf{}
+%\chead{}
+%\lhead{\sf \shorttitle}
+%\rhead{\sf } % Could use \leftmark for the current section
+%\lfoot{}
+%\cfoot{\sf \thepage}
+%\rfoot{}
+\fi
+
+\begin{document}
+
+\title[MRSA Algorithm]{A Model to Flag Patients Likely to Develop a MRSA Infection}
+
+\author{JoAnn Alvarez}
+%\newcommand*{\shorttitle}{Readmission Surveys}
+
+\makebeamertitle
+\maketitle
+\tableofcontents
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%%                                      END OF FRONT MATTER
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%%                                      SET UP WORKSPACE AND ENVIRONMENT
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+<<opts, echo=FALSE>>=
+# Set some global options for knitr
+# NB: the knitr library is already loaded in my .Rprofile when I start R.
+
+opts_knit$set(progress = TRUE, verbose = FALSE, eval.after = c("fig.cap"))
+opts_chunk$set(
+   cache = FALSE,
+   echo = FALSE,
+   tidy = FALSE,
+   dev = "pdf",
+   fig.path="figures/plot",
+   out.width=".77\\textwidth",
+   fig.keep="high",
+   fig.show="hold",
+   fig.align="center",
+   autodep = TRUE,
+   comment=NA)
+knit_hooks$set(inline = function(x) {
+   if (is.numeric(x)) return(knitr:::format_sci(round(x, 1), 'latex'))
+   x = as.character(x)
+   h = knitr:::hilight_source(x, 'latex', list(prompt=FALSE, size='normalsize', highlight = FALSE))
+   h = gsub("([_#$%&])", "\\\\\\1", h)
+   h = gsub('(["\'])', '\\1{}', h)
+   gsub('^\\\\begin\\{alltt\\}\\s*|\\\\end\\{alltt\\}\\s*$', '', h)})
+par(las = 1)
+options(width = 90, scipen = 6, digits = 3, prType = 'latex')
+@
+
+<<setWorkingDirectory, include=FALSE>>=
+setwd("E:/READMISSION/readmission_reduction_interventions/analysis")
+@
+
+<<getMyUserDefinedFunctions, include=FALSE, warning=FALSE, eval=TRUE>>=
+#library(RCurl)
+#eval(expr = parse(text = getURL('https://raw.githubusercontent.com/ruddjm/Rfunctions/master/Rfunctions.R')))
+#eval(expr = parse(text = getURL('https://raw.githubusercontent.com/ruddjm/Rfunctions/master/forestPlots.R')))
+@
+
+<<loadPackages, include=FALSE, eval=TRUE>>=
+library(Hmisc)
+library(ggplot2)
+library(data.table)
+library(xtable)
+@
+
+
+\section{What is MRSA?}
+
+
+\begin{frame}[fragile]{What is MRSA?}
+
+Methicillin-resistant Staphylococcus aureus
+% MRSA is a staph infection that doesn't respond to certain antibiotics
+
+Hospital- and community- acquired
+% Often developed in hospital and can also be contracted in the community
+\end{frame}
+
+
+staph is a bacteria
+many people have staph on skin or in nose.
+Some people 'carry' mrsa
+mrsa exists because of bacteria's evolution to survive different antibiotics
+hospital acquired and community acquired.
+diagnosed by a lab test
+
+when a CA infection is localized to the skin or soft tissue, can be treated.
+Can spread to blood and internal organs and cause sepsis.
+Spreads betweeen patients and providers.
+diagnosed by blood culture and microbiology or PCR, which can detect mrsa dna.
+~ 80k life-threatening cases per year in US. 
+
+
+\begin{frame}{Human and Financial Costs of MRSA}
+\noindent Human and Financial Costs of MRSA
+
+\end{frame}
+
+
+
+
+Cost of mrsa
+infections can spread and become life threatening.
+people die
+
+costs hospitals lots of money
+face liability
+lose insurance reimbursements
+impacts hospital quality ratings.
+Hospitals are required to report to CMS and to some states require
+CMS reduces payment if the infection is preventable or if the hospital has high MRSA rates.
+
+
+
+
+Hospitals develop protocols
+screen to identify carriers.
+  nasal swab.
+  
+  prevent spread via handwashing, keep wounds clean and covered
+
+  isolate patients
+
+Tx
+  urgent
+  give oral or iv antibiotics
+  there are different tiers of abx that strains of mrsa are successively resistant to. 
+  vancomycin and teicoplanin are used 
+  daptomycin when it's resistant to others.
+  linezolid
+
+
+\section{Data Acquisition}
+\begin{frame}{}
+
+Used diagnoses codes. 
+% There are 10s of thousands of codes . used 6
+% international classification of disease codes
+
+Would like to supplement with microbiology lab data, but are still working on connecting the data systems.
+\end{frame}
+
+
+
+
+
+
+
+
+
+
+<<aaa1, fig.width=7, fig.height=5, out.width="1.05\\textwidth">>=
+#, fig.cap='Implementation Rates'
+implementation_rate = interventions_long[ , mean(value2 == 1), by = Question][order(-V1)]
+implementation_rate[ , Question := gsub('_', ' ', Question)]
+
+ggplot(implementation_rate[Question %in% gsub('_', ' ', questions)], aes(V1, y = reorder(Question, V1))) +
+geom_point() +
+scale_x_continuous(labels = scales::percent, limits = c(0, 1)) +
+labs(x = 'Percentage of Hospitals', y = '', title = 'Implementation Rates')
+@
+\end{frame}
+
+
+
+\begin{frame}[fragile]
+<<forestplot, fig.width=7, fig.height=5, out.width="1.05\\textwidth">>=
+#forestplot(ci_results[ , .(Difference, Lower, Upper)], rownms = ci_results[ , Question], estimateLabel = 'dsa', refLine = 0)
+pllq = ggplot(compare_rates_by_use[!grepl('tier', Question)],
+       aes(reorder(Question, avg_facility_condition_adjusted_rate), 
+           100*Difference, 
+           ymin = 100*Lower, 
+           ymax = 100*Upper,
+           colour = Question)) + 
+  geom_linerange(size = 2, linetype = 1, alpha = 0.8) +
+  theme(legend.position = 'none') +
+  labs(y = '"Reduction" in Rate (percentage points)', x = '', title = '') +
+  coord_flip(ylim = c(-5, 5)) +
+  geom_hline(yintercept = 0, linetype = 2, alpha = 0.3, size = 1)
+suppressWarnings(print(pllq))
+@
+\end{frame}
+
+
+
+\begin{frame}[fragile]
+<<fig.width=7, fig.height=5, out.width="1.05\\textwidth">>=
+interventions_long[ , Question := gsub('_', ' ', Question)]
+ggplot(interventions_long[Question == "Identifies 30 Day Readmits in ED"], aes(facility_condition_adjusted_rate, y = value, size = facility_size, colour = value)) +
+  geom_jitter(height = 0.03, alpha = 0.5) +
+  theme(legend.title=element_blank(),
+        legend.key = element_rect(fill = NA, colour = NA)) +
+  scale_x_continuous(labels = scales::percent) + 
+  #, limits = c(0.04, 0.15)) +
+  labs(x = 'Readmission Rate', y = '', title = 'Consistent process to identify 30 day readmission patients in ED') +
+  guides(size = FALSE, colour = guide_legend(override.aes = list(alpha = 1)))
+@
+\end{frame}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Number of Interventions}
+
+
+\begin{frame}[fragile]
+<<number_of_interventions, fig.width=5, fig.height=5, out.width="3in">>=
+# Show distribution of number of interventions
+ggplot(surveyDat5, aes(x = number_of_interventions)) + 
+  geom_dotplot(binwidth = 1, method = "dotdensity", dotsize = 0.4) + 
+  ylim(0, 15) +
+  labs(y = 'Number of Hospitals', x = 'Number of Interventions', title = '')
+@
+\end{frame}
+
+
+\begin{frame}[fragile]
+<<number_of_interventions_bubble3>>=
+ggplot(surveyDat5, aes(number_of_interventions, facility_condition_adjusted_rate, size = N, colour = "#0091ff")) + 
+  geom_point(alpha = 0.5, show.legend = FALSE) +
+  coord_cartesian(ylim = c(0, 0.2), xlim = c(0, 14)) +
+  scale_y_continuous(labels = scales::percent) +
+  xlim(0, 20) +
+  labs(y = 'Adjusted Readmission Rate', 
+       x = 'Number of Interventions', 
+       title = 'Number of Interventions'
+       #, 
+       #subtitle = 'Each point represents one survey response.'
+       ) +   # Size proportionate to hospital size
+  geom_smooth(method = 'lm', fullrange = TRUE) + 
+  theme(legend.position = 'none')
+@
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Alert Rate}
+\begin{frame}[fragile]{Classified hospitals into tiers}
+<<results='asis'>>=
+# Make a dt to display the tier definitions
+numrows = max(length(tier1), length(tier2), length(tier3))
+tier_defs = data.table('Tier 1' = c(gsub('_', ' ', tier1), rep(NA, numrows - length(tier1))), 
+           'Tier 2' = c(gsub('_', ' ', tier2), rep(NA, numrows - length(tier2))),
+           'Tier 3' = c(gsub('_', ' ', tier3), rep(NA, numrows - length(tier3))))
+print(xtable(tier_defs), include.rownames = FALSE, size = 'tiny')
+@
+\end{frame}
+
+\begin{frame}[fragile]
+<<tier, fig.width=3.5, fig.height=3.5, out.width='.49\\linewidth'>>=
+ggplot(surveyDat5, aes(x = tier, fill = tier)) + 
+ geom_bar(width = 0.2) + 
+ scale_fill_brewer() +
+ theme(legend.position = 'none') +
+ #ylim(0, 15) +
+ labs(x = 'Tier', y = 'Number of Hospitals')
+
+df = surveyDat5[ , .N, by = tier][order(tier)]
+df[ , tier := factor(paste('Tier ', tier, sep = ''))]
+df[ , break_pos := sum(N) - cumsum(N) + N/2]
+df[ , pct := N/sum(df$N)]
+
+# ggpie: draws a pie chart.
+# give it:
+# * `dat`: your dataframe
+# * `by` {character}: the name of the fill column (factor)
+# * `totals` {character}: the name of the column that tracks
+#    the time spent per level of `by` (percentages work too).
+# returns: a plot object.
+ggpie <- function (dat, by, totals) {
+    ggplot(dat, aes_string(x=factor(1), y=totals, fill=by)) +
+        geom_bar(stat='identity', width = 1) +  #, color='black'
+        scale_fill_brewer() +
+        guides(fill=guide_legend(override.aes=list(colour=NA))) + # removes black borders from legend
+        coord_polar(theta='y', direction = 1) +
+        theme(axis.ticks=element_blank(),
+            axis.text.y=element_blank(),
+            axis.text.x=element_text(colour='black'),
+            axis.title=element_blank(),
+            legend.position = 'none',
+            panel.background = element_rect(fill = "white")) +
+    scale_y_continuous(breaks= sum(dat[[totals]]) - cumsum(dat[[totals]]) + (dat[[totals]] / 2), labels=dat[[by]])    
+}
+ggpie(df, 'tier', 'N')
+@
+\end{frame}
+
+
+\begin{frame}[fragile]
+<<fig.width=7, fig.height=5, out.width="1.05\\textwidth">>=
+ggplot(compare_rates_by_use[Question %in% gsub('_', ' ', tier_names)], aes(avg_facility_condition_adjusted_rate, y = reorder(Question, -order(Question)), size = N, colour = value)) +
+  geom_point() +
+  theme(legend.title=element_blank(),
+        legend.key = element_rect(fill = NA, colour = NA)) +
+  scale_x_continuous(labels = scales::percent, limits = c(0.04, 0.15)) +
+  labs(x = 'Average Condition-Adjusted Readmission Rate', y = '', title = '') +
+  guides(size = FALSE)
+@
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Choosing Threshold}
+
+
+
+
+
+
+
+
+
+If the model were well calibrated, we could just use the alert rate we wanted as the cut off.
+
+
+
+
+
+<<>>=
+plot 1: roc of 2 models
+plot 2: showing cutoff on x axis and sensitivity and PPV/specificity on y axis for model 1
+plot 3: Cutoff by alert rate.
+
+Also show alert rate.
+
+plot of alert rate 
+@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%\section{Appendix}
+\begin{frame}
+Appendix
+\end{frame}
+
+
+\begin{frame}[fragile]{Readmission Rates}
+Used second half of 2017 to investigate relationships\\
+\bigskip
+\bigskip
+\bigskip
+\bigskip
+Overall readmission rate for second half of 2017: \Sexpr{readmitDat[ , round(100*mean(thirty_day_readmit_flg == TRUE & planned_readmission_flg == 0), 1)]} \%
+\end{frame}
+
+
+
+\begin{frame}[fragile]{Adjustment for Index Condition}
+Adjusted for index condition using second half of 2016 as reference
+\end{frame}
+
+\begin{frame}[fragile]
+Overall readmission rate for second half of 2017: \Sexpr{readmitDat[ , round(100*mean(thirty_day_readmit_flg == TRUE & planned_readmission_flg == 0), 1)]} \%  \\
+  
+\bigskip
+\bigskip
+\bigskip
+\bigskip
+Adjusted for index condition: \Sexpr{readmitDat[ , round(100*institution_wide_condition_adjusted_readmission_rate, 1)]} \%
+
+<<echo=FALSE>>=
+#institution_wide_condition_adjusted_readmission_index
+@
+\end{frame}
+
+
+\begin{frame}[fragile]
+<<>>=
+# Put in order with overall first and then in order of readmission rate descending.
+orden = ref_rates[ , c(which(index_condition == 'Overall'), which(index_condition == 'HF'), which(index_condition == 'COPD'), which(index_condition == 'PN'), which(index_condition == 'CABG'), which(index_condition == 'AMI'), which(index_condition == 'STROKE'), which(index_condition == 'THK/TKA'))]
+#order(ref_rates$index_condition, orden)
+
+ggplot(ref_rates, aes(reorder(index_condition, order(orden)), Reference_Readmission_Rate, ymin = lower, ymax = upper)) + 
+  geom_linerange(size = 2, linetype = 1, alpha = 0.8) +
+  coord_cartesian(ylim = c(0, 0.2))+
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  labs(x = 'Index Condition', y = 'Reference Readmission Rate', title = 'Readmission Rates Q3 and Q4 2016 used as\nreference to adjust for index condition')
+@
+\end{frame}
+
+
+\begin{frame}[fragile]
+<<fig.width=7, fig.height=5, out.width="1.05\\textwidth">>=
+ggplot(facility_level_rates_long, aes(reorder(facility_cd, readmission_rate), readmission_rate, colour = rate_type)) + 
+geom_point(size = 2) +
+coord_cartesian(ylim = c(0, 0.2)) +
+theme(legend.position = c(1, 0),
+      legend.title=element_blank(),
+      legend.key = element_rect(fill = NA, colour = NA),
+      legend.justification = c(1, 0),
+      legend.box.margin = margin(c(40, 40, 40, 40)),
+      axis.text.x = element_text(angle = 90, hjust = 1, size = 6)) +
+scale_y_continuous(labels = scales::percent) +
+labs(y = 'Readmission Rate', x = '', title = 'Readmission Rates Q3 and Q4 2017')
+#+
+#coord_fixed(ratio = 300) 
+@
+\end{frame}
+
+
+\begin{frame}[fragile]
+<<fig.width=7, fig.height=5, out.width="1.05\\textwidth">>=
+ggplot(facility_level_rates_long[rate_type == 'Condition_Adjusted'], aes(reorder(facility_cd, readmission_rate), readmission_rate, colour = rate_type)) + 
+geom_point(size = 2) +
+coord_cartesian(ylim = c(0, 0.2)) +
+theme(legend.position = 'none',
+      axis.text.x = element_text(angle = 90, hjust = 1, size = 5)) +
+scale_y_continuous(labels = scales::percent) +
+labs(y = 'Readmission Rate', x = '', title = 'Condition-Adjusted Readmission Rates Q3 and Q4 2017')
+@
+\end{frame}
+
+
+\begin{frame}[fragile]
+<<fig.width=7, fig.height=5, out.width="1.05\\textwidth">>=
+interventions_long[ , Question := gsub('_', ' ', Question)]
+ggplot(interventions_long[Question == "One Person in Charge of Readmission"], aes(facility_condition_adjusted_rate, y = value, size = facility_size, colour = value)) +
+  geom_jitter(height = 0.03, alpha = 0.5) +
+  theme(legend.title=element_blank(),
+        legend.key = element_rect(fill = NA, colour = NA)) +
+  scale_x_continuous(labels = scales::percent) + 
+  #, limits = c(0.04, 0.15)) +
+  labs(x = 'Hospital Condition-Adjusted Readmission Rate', y = 'One Person in Charge of Readmission', title = 'Readmission rates. Each point represents one hospital.') +
+  guides(size = FALSE, colour = guide_legend(override.aes = list(alpha = 1)))
+@
+\end{frame}
+
+\begin{frame}[fragile]
+<<fig.width=7, fig.height=5, out.width="1.05\\textwidth">>=
+ggplot(fac_by_index_condition[index_condition == 'AMI' & N > 50], aes(x = reorder(facility_cd, Readmission_Rate), Readmission_Rate, ymin = lower, ymax = upper)) + 
+geom_errorbar() +
+labs(x = '', y = 'Readmission Rate', title = 'Among AMI Cases') +
+coord_fixed(ratio = 100) +
+scale_y_continuous(labels = scales::percent) +
+theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 9)) 
+@
+%We can make few useful conclusions regarding subsets of different index\_conditions.
+\end{frame}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Cut
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%\begin{frame}[fragile]
+<<aaa2, fig.width=7, fig.height=5, out.width="1.05\\textwidth", include=FALSE, eval=FALSE>>=
+ggplot(implementation_rate[Question %in% gsub('_', ' ', tier_names)], aes(V1, y = reorder(Question, V1))) +
+geom_point() +
+scale_x_continuous(labels = scales::percent, limits = c(0, 1)) +
+labs(x = 'Percentage of Hospitals', y = '', title = '')
+@
+%\end{frame}
+
+%\begin{frame}[fragile]
+<<echo=FALSE>>=
+#readmitDat[ , table(thirty_day_readmit_flg, same_cause_flg, exclude = NULL)]
+#readmitDat[ , table(thirty_day_readmit_flg, planned_readmission_flg, exclude = NULL)]
+#readmitDat[thirty_day_readmit_flg == 1, table(index_condition, readmit_account_diagnosis_condition, exclude = NULL)]
+@
+%\end{frame}
+
+
+\if0
+\begin{frame}[fragile]
+<<fig.width=7, fig.height=5, out.width="1.05\\textwidth">>=
+ggplot(surveyDat5, aes(y = facility_condition_adjusted_rate, x = cluster, colour = cluster)) +
+  geom_jitter(width = 0.03, alpha = 0.5) +
+  theme(legend.title=element_blank()) +
+  scale_y_continuous(labels = scales::percent) + 
+  #, limits = c(0.04, 0.15)) +
+  labs(y = 'Hospital Condition-Adjusted Readmission Rate', x = 'Cluster', title = 'Readmission rates. Each point represents one hospital.')
+@
+\end{frame}
+\fi
+
+
+
+\if0
+\begin{frame}[fragile]{Cluster analysis of hospitals}
+<<dend, fig.width=7, fig.height=5, out.width="1.1\\textwidth", eval=FALSE, include=FALSE>>=
+plot(hclustObj, 
+     hang = -1, 
+     sub = '', 
+     xlab = '', 
+     cex = 0.45, 
+     ylab = '',
+     yaxt = 'n',
+     main = 'Clustering of Survey Responses',
+     tcl = -0.15, 
+     las = 1)
+rect.hclust(hclustObj, k = 4, border = 2:5)
+@
+
+
+\begin{frame}[fragile]{Cluster analysis of hospitals}
+<<dendextend, fig.width=7, fig.height=5, out.width="1.1\\textwidth", eval=FALSE, include=FALSE>>=
+dend = as.dendrogram(hclustObj)
+colors_to_use <- as.numeric(surveyDat5$tier) + 1
+#colors_to_use
+# But sort them based on their order in dend:
+colors_to_use <- colors_to_use[order.dendrogram(dend)]
+#colors_to_use
+labels_colors(dend) <- colors_to_use
+# Now each state has a color
+labels_colors(dend) 
+plot(dend,
+    main = 'Clustering of Survey Responses',
+     yaxt = 'n')
+
+rect.hclust(hclustObj, k = 4, border = 2:5)
+legend('topright', fill = 1:4, legend = 1:4, bty = 'n', title.adj = 0, title = 'Tier')
+@
+\end{frame}
+
+
+\begin{frame}[fragile]{Cluster analysis of hospitals}
+<<fig.width=7, fig.height=5, out.width="1.05\\textwidth">>=
+ggplot(fac_level[N > 500], aes(x = reorder(facility_cd, Readmission_Rate), Readmission_Rate, ymin = lower, ymax = upper)) + 
+geom_errorbar() +
+labs(x = '', y = 'Unadjusted Readmission Rate', title = 'Hospital-Wide') +
+coord_fixed(ratio = 100) +
+scale_y_continuous(labels = scales::percent) +
+theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 9)) 
+#+
+#coord_cartesian(ylim = c(0, 0.25))
+@
+\end{frame}
+\fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<<eval=FALSE>>=
+forestplot = function(dats, rownms, estimateLabel, refLine){
+   if(nrow(dats) != length(rownms)) stop("What the heck are you trying to do?\\n")
+   ys <- rev(seq_len(nrow(dats)))
+
+   currentPar <- par(no.readonly = TRUE) # the whole list of settable par's.
+   par(mar = c(4, 17, 2, 0) + 0.1)
+   plot(x = dats[[1]],
+      y = ys,
+      xlim = c(min(dats), max(dats)) + c(-1, 1)*0.2,
+      ylab = "",
+      bty = "n",
+      #ylim = c(0.5, max(ys) + 0.5),
+      las = 1,
+      yaxt = "n",
+      xlab = estimateLabel)
+
+   axis(side = 2,
+      at = ys, # + 0.5,
+      tcl = 0,
+      las = 1,
+      hadj = 0.5,
+      font.axis = 2,
+      line = 7,
+      lty = "blank",
+      labels = rownms)
+
+   arrows(x0 = dats[[2]],
+      x1 = dats[[3]],
+      angle = 90,
+      lty = 3,
+      length = 0.07,           # length of arrow heads
+      code = 3,               # heads at both ends of arrows
+      y0 = ys)
+   if(!is.null(refLine)){
+      abline(v = refLine, lty = 4, col = 328)}
+   par(currentPar)}
+@
+
+
+
+
+
+
+
+
+
+\begin{frame}[fragile]
+<<fig.width=7, fig.height=5, out.width="1.05\\textwidth">>=
+
+ggplot(compare_rates_by_use[Question %in% gsub('_', ' ', questions)], 
+       aes(avg_facility_condition_adjusted_rate, y = reorder(Question, avg_facility_condition_adjusted_rate), size = N, colour = value)) +
+  geom_point() +
+  theme(legend.title=element_blank(),
+        legend.key = element_rect(fill = NA, colour = NA)) +
+  scale_x_continuous(labels = scales::percent, limits = c(0.04, 0.15)) +
+  labs(x = 'Readmission Rate', y = '', title = '') +
+  guides(size = FALSE)
+  
+  
+@
+\end{frame}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\end{document}
+
