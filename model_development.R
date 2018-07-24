@@ -22,15 +22,15 @@ library(ROCR)
 ######################################################################################################
 ## Load data  
 ######################################################################################################
-fnamee = paste('../data/saved_R_workspaces_or_objects/key_datatables_end_of_dataManipulation.Rdata', sep = "")
-load(file = fnamee, verbose = TRUE)
+#fnamee = paste('../data/saved_R_workspaces_or_objects/key_datatables_end_of_dataManipulation.Rdata', sep = "")
+#load(file = fnamee, verbose = TRUE)
 
 ## Load labs and vitals data
 # Individual hour files
 #for(i in seq_along(r_obj_names)){
 #  load(r_obj_names[i], verbose = TRUE)}
 # Combined file
-load(paste(fname_beginning, '_all_hrs_', r_obj, fname_end, '.Rdata', sep = ""), verbose = TRUE)
+#load(paste(fname_beginning, '_all_hrs_', r_obj, fname_end, '.Rdata', sep = ""), verbose = TRUE)
 
 # Make sure there is only one age variable. There are age columns in both dataframe wide and mainDat.
 ## Features to use from main data
@@ -43,6 +43,16 @@ fewer_vars = Cs(
                     #, age
                     # los_so_far ## Need to think more about how to deal with this. 
                     # time of day of presentation?
+                    , trauma_ward_by_3_hours
+                    , ob_location_by_3_hours
+                    , surg_location_by_3_hours
+                    , rehab_by_3_hours
+                    #, first_location
+                    #, first_location_critical_care
+                    #, location_at_3_hours
+                    , in_critical_care_at_3_hours 
+                    , regn_nm
+                    , licensed_bed_count
                     , do_not_resuscitate
                     , race # interaction between race and ethnicity 
                     , sex_cd
@@ -79,12 +89,36 @@ ryans_vars = tolower(
   ,'AGE_AT_ADMIT'
   ,'WBC_FIRST'
   ,'RSLT_MAP_FIRST'
-  ,'SIA_END'))
-labs_vitals_all_hrs = labs_vitals_all_hrs[ , c('encounter_id', 'hours', ryans_vars), with = FALSE]
+  ,'SIA_END'))            # shock index by age.
+labs_vitals_all_hrs = labs_vitals_all_hrs[ , c('encounter_id', 'hour', ryans_vars), with = FALSE]
 # Add outcome
 labs_vitals_all_hrs[ , any_systemic_mrsa := main_w_prev_enc$any_systemic_mrsa[match(encounter_id, main_w_prev_enc$encounter_id)]]
 labs_vitals_all_hrs = labs_vitals_all_hrs[!is.na(any_systemic_mrsa)]
 labs_vitals_all_hrs[ , mrsa_fac := factor(any_systemic_mrsa, levels = c(1, 0), labels = c('yes', 'no'))]
+
+
+ggplot(labs_vitals_all_hrs, aes(age_at_admit, any_systemic_mrsa)) +
+geom_smooth() +
+coord_cartesian(xlim = c(18, 100), ylim = c(0, 0.10))
+
+ggplot(labs_vitals_all_hrs[weight_kg != -9999], aes(weight_kg*2.2046, any_systemic_mrsa)) +
+geom_smooth()  +
+coord_cartesian(xlim = c(75, 400), ylim = c(0, 0.10)) +
+geom_line(y = 0.003)
+# Why are their probs elevated? Because their weight was measured in the first place.
+
+
+ggplot(labs_vitals_all_hrs[weight_kg != -9999], aes(weight_kg*2.2046)) +
+geom_density()  
+
+
+
+# less interesting
+ggplot(labs_vitals_all_hrs[!is.na(bmi)], aes(bmi, any_systemic_mrsa)) +
+geom_smooth() +
+coord_cartesian(xlim = c(15, 40), ylim = c(0, 0.04)) +
+geom_line(y = 0.003)
+
 ######################################################################################################
 ## Merge lab/vit and other IDM data.
 ######################################################################################################
@@ -108,23 +142,25 @@ all_all_hrs = merge(
 #                                  times = 1) 
 # trainEncounters = main_w_prev_enc[trainIndex, encounter_id]
 # testEncounters = main_w_prev_enc[-trainIndex, encounter_id]
-set.seed(2046)
-trainIndex = createDataPartition(labs_vitals_all_hrs[hour == 1, any_systemic_mrsa],  # stratifies by mrsa
+set.seed(124800)
+trainIndex = createDataPartition(all_all_hrs[hour == 1, any_systemic_mrsa],  # stratifies by mrsa
                                  p = 0.70,
                                  list = FALSE,
                                  times = 1) 
-trainEncounters = labs_vitals_all_hrs[hour == 1][trainIndex, encounter_id]
-testEncounters = labs_vitals_all_hrs[hour == 1][-trainIndex, encounter_id]
+trainEncounters = all_all_hrs[hour == 1][trainIndex, encounter_id]
+testEncounters = all_all_hrs[hour == 1][-trainIndex, encounter_id]
 
 ## For the **LAB DATA**, choose one hour (one row) for each encounter. Then filter to only train patients. This will be used to train on.
 # (We don't need to choose an hour for each *test* patient, because we will probably assess performance separately on each hour.)
 setkey(labs_vitals_all_hrs, encounter_id, hour)
+setkey(all_all_hrs, encounter_id, hour)
 # Randomly sort the hours:
-hours = labs_vitals_all_hrs[ , sort(unique(hour))]    #   c(0, 3, 6, 12, 24)
-hrz = sample(rep(hours, length(unique(labs_vitals_all_hrs$encounter_id))/length(hours)))
+hours = labs_vitals_all_hrs[ , sort(unique(hour))]    #   c(1, 3, 6, 12, 24)
+hrz = sample(hours, length(unique(labs_vitals_all_hrs$encounter_id)), replace = TRUE)
 
 labs_vitals_random_hour = labs_vitals_all_hrs[.(unique(encounter_id), hrz)]
 all_random_hour = all_all_hrs[.(unique(encounter_id), hrz)]
+
 labs_vitals_random_hour_train = labs_vitals_random_hour[trainEncounters]
 all_random_hour_train                 = all_random_hour[trainEncounters]
 # I think we don't need a test set from these data, because it only has one hour per encounter. 
@@ -149,7 +185,8 @@ trained_recipe_all = prep(all_vars_recipe_obj,
 # Apply the recipe to the original data
 prepared_training_dat_all = data.table(juice(trained_recipe_all))
 # Prepare test data
-prepared_test_dat_all = data.table(bake(trained_recipe_all, newdata = all_random_hour[testEncounters]))
+prepared_test_dat_all = data.table(bake(trained_recipe_all, newdata = all_all_hrs[testEncounters]))
+setcolorder(prepared_test_dat_all, names(prepared_training_dat_all))
 ###################################################################################################################
 ###################################################################################################################
 ## 
@@ -165,9 +202,6 @@ sparse_mat_train = sparse.model.matrix(any_systemic_mrsa ~ . - 1,
 sparse_mat_test  = sparse.model.matrix(any_systemic_mrsa ~ . - 1, 
                                  data = labs_vitals_all_hrs[testEncounters, c('any_systemic_mrsa', 'hour', ryans_vars), with = FALSE])  ## Cannot use -trainIndex because that is only applicable to data[hour = 1].
 
-
-
-
 #sparse_mat_all_train = sparse.model.matrix(any_systemic_mrsa ~ . - 1, 
 #                                 data = all_random_hour_train[ , c('any_systemic_mrsa', 'hour', ryans_vars, fewer_vars), with = #FALSE])
 sparse_mat_all_train = sparse.model.matrix(any_systemic_mrsa ~ . - 1, 
@@ -180,11 +214,9 @@ sparse_mat_all_test  = sparse.model.matrix(any_systemic_mrsa ~ . - 1,
 ryan_orig_parameters = list(
    objective = "binary:logistic", 
    eval_metric = "auc", 
-   
    eta = 0.1,                     # default = 0.3               
    max.depth = 4,                 # default = 6         
    subsample=0.5                  # default = 1
-   
    # Defaults
    # min_child_weight  default = 1
    # colsample_bytree  default = 1
@@ -193,7 +225,6 @@ ryan_orig_parameters = list(
 # For both 1 hr and 6 hour together, for a > 0.01 cut off:
       ROC      Sens      Spec 
 0.9112544 0.6512089 0.9344103 But very bad ppv.
-
 a_la_verga_parameters = list(
    objective = "binary:logistic", 
    eval_metric = "auc", 
@@ -206,7 +237,6 @@ a_la_verga_parameters = list(
    # min_child_weight  default = 1
    colsample_bytree = 0.8 # default = 1
 )
-
 # I wrote this one formatted for input in caret. 
 ryan_tune_grid <- expand.grid(nrounds = c(100, 192, 300, 1000)
                          , eta = 0.1       
@@ -217,19 +247,18 @@ ryan_tune_grid <- expand.grid(nrounds = c(100, 192, 300, 1000)
                          , colsample_bytree = c(1)     # Default is 1.  
                          , min_child_weight = 1        # Default is 1.                 
                      )
-
 # Tune more thoroughly!
 tune_grid <- expand.grid(
-    nrounds = c(100, 200, 300, 400, 500)
+    nrounds = c(1189)
   , eta = c(0.03, 0.06, 0.1)       
   , max_depth = c(5, 7)            
-  , subsample = c(0.5, 0.6, 0.7)                            
-  , gamma = 0                   # Default is 0. Try higher if big difference between train and test metrics. Try 10 or 20.
-  , colsample_bytree = c(0.8, 1)     # Default is 1.  
+  , subsample = c(0.6, 0.7)                            
+  , gamma = c(0, 10)                   # Default is 0. Try higher if big difference between train and test metrics. Try 10 or 20.
+  , colsample_bytree = c(0.8, 0.9)     # Default is 1.  
   , min_child_weight = c(1, 10)        # Default is 1.                 
 )
 ya_tune_grid <- expand.grid(
-    nrounds = c(100, 200, 300, 400)
+    nrounds = c(400, 800, 1189)
   , eta = c(0.03, 0.06, 0.1)       
   , max_depth = c(5)            
   , subsample = c(0.7)                            
@@ -276,14 +305,11 @@ mod1 = xgboost(data = sparse_mat_train,
                 verbose = TRUE,                                         
                 print_every_n = 10,
                 early_stopping_rounds = 20                                # stop if no improvement within 20 trees
-                
-)
+                )
 ss - Sys.time()
 save(mod1, cv1, file = 'other_model_objects/original_untuned_labs_only.Rdata')
-
 ## Train AUC
 mod1$best_score
-
 ## Test AUC   
 preds_mod1_on_test <- predict(mod1, sparse_mat_test)
 test_preds_dt = labs_vitals_all_hrs[testEncounters, .(encounter_id, hour, pred = preds_mod1_on_test, any_systemic_mrsa)]
@@ -299,7 +325,7 @@ importance_matrix
 ###################################################################################################################
 ## Train using more variables
 ss = Sys.time()
-set.seed(1234)
+set.seed(56000)
 # This is cross validation and picks the best number of rounds, for a single set of model hyperparameters.
 cv_all = xgb.cv(params = a_la_verga_parameters,
                   data = sparse_mat_all_train,
@@ -310,41 +336,97 @@ cv_all = xgb.cv(params = a_la_verga_parameters,
                   showsd = TRUE,                                               # standard deviation of loss across folds
                   stratified = TRUE,                                           # sample is unbalanced; use stratified sampling
                   verbose = TRUE,
-                  print_every_n = 1, 
-                  early_stopping_rounds = 100,
+                  print_every_n = 10, 
+                  early_stopping_rounds = 45,
                   missing="NAN")
+save(cv_all, file = 'mod_all/cv_all.Rdata')
+Sys.time() - ss
+9]  train-auc:0.967640+0.000501     test-auc:0.939874+0.001808
+
+Took 2 hours and stopped at 1189.
 ss = Sys.time()
 # Fit the model
 # Uses the number of rounds found in the cv step. (See the nrounds arg.)
-mod_all = xgboost(data = sparse_mat_train,
-                label = labs_vitals_random_hour_train[ , any_systemic_mrsa],
-                params = ryan_orig_parameters,
-                nrounds = cv1$best_iteration,  
+mod_all = xgboost(data = sparse_mat_all_train,
+                label = all_random_hour_train[ , any_systemic_mrsa],
+                params = a_la_verga_parameters,
+                nrounds = 1189, #cv1$best_iteration,  
                 verbose = TRUE,                                         
-                print_every_n = 10,
-                early_stopping_rounds = 100                                # stop if no improvement within 20 trees
-                
+                print_every_n = 100,
+                early_stopping_rounds = 100                                # stop if no improvement within 20 rounds
 )
-ss - Sys.time()
+Sys.time() - ss 
 save(mod_all, cv_all, file = 'mod_all/mod_all_cv_all.Rdata')
-
+plot(cv_all$evaluation_log$train_auc_mean, ylim = c(0, 1))
+points(cv_all$evaluation_log$test_auc_mean, col = 'red')
+x11()
+plot(cv_all$evaluation_log$train_auc_mean, ylim = c(0.75, 1))
+points(cv_all$evaluation_log$test_auc_mean, col = 'red')
 ## Train AUC
 mod_all$best_score
 
 ## Test AUC   
 preds_mod_all_on_test <- predict(mod_all, sparse_mat_all_test)
-test_preds_all = all_all_hrs[testEncounters, .(encounter_id, hour, pred = preds_mod_all_on_test, any_systemic_mrsa)]
-test_preds_all[hour == 1, somers2(pred, any_systemic_mrsa)]
+test_preds_all_df = all_all_hrs[testEncounters, .(encounter_id, hour, pred = preds_mod_all_on_test, any_systemic_mrsa)]
+test_preds_all_df[hour == 1, somers2(pred, any_systemic_mrsa)]
+           C            Dxy              n        Missing 
+     0.9234872      0.8469744 815399.0000000      0.0000000 
 
 
-test_preds_all[hour == 6, somers2(pred, any_systemic_mrsa)]
+test_preds_all_df[hour == 6, somers2(pred, any_systemic_mrsa)]
+          C            Dxy              n        Missing 
+     0.9257115      0.8514230 815399.0000000      0.0000000 
 
 
-feat_names <- dimnames(sparse_mat_train)[[2]]
-importance_matrix <- xgb.importance(feat_names, model = mod1)
-xgb.plot.importance(importance_matrix[])
+feat_names <- dimnames(sparse_mat_all_test)[[2]]
+importance_matrix_mod_all <- xgb.importance(feat_names, model = mod_all)
+xgb.plot.importance(importance_matrix_mod_all[])
 importance_matrix
-###################################################################################################################
+
+twoClassSummary(data = test_preds_all_df[hour == 1, .(obs = factor(any_systemic_mrsa, levels = c(1, 0), labels = c('yes', 'no')), 
+                 pred = factor(as.numeric(pred > 0.01), levels = c(1, 0), labels = c('yes', 'no')),
+                 yes =                    pred)],
+  lev = c('yes', 'no'))
+      ROC      Sens      Spec 
+0.9234872 0.6203537 0.9524395 
+
+twoClassSummary(data = test_preds_all_df[hour == 6, .(obs = factor(any_systemic_mrsa, levels = c(1, 0), labels = c('yes', 'no')), 
+                 pred = factor(as.numeric(pred > 0.01), levels = c(1, 0), labels = c('yes', 'no')),
+                 yes =                    pred)],
+  lev = c('yes', 'no'))
+ ROC      Sens      Spec 
+0.9257115 0.6171057 0.9538042 
+
+twoClassSummary(data = test_preds_all_df[hour == 6, .(obs = factor(any_systemic_mrsa, levels = c(1, 0), labels = c('yes', 'no')), 
+                 pred = factor(as.numeric(pred > 0.0491), levels = c(1, 0), labels = c('yes', 'no')),
+                 yes =                    pred)],
+  lev = c('yes', 'no'))
+      ROC      Sens      Spec 
+0.9257115 0.2623602 0.9909725 
+
+# For alert rate of 1%, cutoff is 0.0491
+test_preds_all_df[hour == 6, .(obs = factor(any_systemic_mrsa, levels = c(1, 0), labels = c('yes', 'no')), 
+                 pred = factor(as.numeric(pred > 0.0491), levels = c(1, 0), labels = c('yes', 'no')),
+                 yes =                    pred)][
+                   , confusionMatrix(pred, obs)
+                   ]
+
+
+# For alert rate of 2%, cutoff is 0.026
+test_preds_all_df[hour == 6, .(obs = factor(any_systemic_mrsa, levels = c(1, 0), labels = c('yes', 'no')), 
+                 pred = factor(as.numeric(pred > 0.026), levels = c(1, 0), labels = c('yes', 'no')),
+                 yes =                    pred)][
+                   , confusionMatrix(pred, obs)
+                   ]
+
+# For alert rate of 3%, cutoff is 0.017
+test_preds_all_df[hour == 6, .(obs = factor(any_systemic_mrsa, levels = c(1, 0), labels = c('yes', 'no')), 
+                 pred = factor(as.numeric(pred > 0.017), levels = c(1, 0), labels = c('yes', 'no')),
+                 yes =                    pred)][
+                   , confusionMatrix(pred, obs)
+                   ]
+
+#################################################################################################################
 ## Train using Ryan's original hyperparams but using caret.
 # Object is to confirm that results are consistent between the packages. If this works, it will be useful because of a built-in grid search framework.
 ss = Sys.time()
@@ -373,7 +455,6 @@ getTrainPerf(mod_obj_ryan_orig_caret)
 ##  Variable importance
 var_imp_ryan_orig <- varImp(mod_obj_ryan_orig_caret, scale = TRUE)
 ggplot(var_imp_ryan_orig, top = 35)
-var_imp_fewer_vars_teeny_w_fac[[1]]
 ######################################################################################################
 ##  Performance with different tuning parameters
 mod_obj_ryan_orig_caret[['results']]
@@ -452,6 +533,7 @@ twoClassSummary(
    
 # Next: try using a recipe object with xgboost function.   
 xgb.plot.tree(feature_names = agaricus.train$data@Dimnames[[2]], model = mod1)  
+xgb.plot.tree(feature_names = names(all_all_hrs), model = mod_all)
 xgb.plot.multi.trees(model = mod1, feature_names = agaricus.train$data@Dimnames[[2]], features_keep = 3
 ###################################################################################################################
 ## ROC Curve
@@ -534,6 +616,13 @@ mod1_prediction_obj = test_preds_dt[ , prediction(pred, any_systemic_mrsa)]
 #.... = prediction(pred, outcome)
 #.... = performance(...., 'rpp')
 mod1_alert_rates_cuttoff_perf_obj = performance(mod1_prediction_obj, 'rpp')
+
+mod_all_prediction_obj = test_preds_all_df[ , prediction(pred, any_systemic_mrsa)]
+#.... = prediction(pred, outcome)
+#.... = performance(...., 'rpp')
+mod_all_alert_rates_cuttoff_perf_obj = performance(mod_all_prediction_obj, 'rpp')
+# Make the result into a data table.
+
 # Make the result into a data table.
 
 
@@ -541,9 +630,16 @@ mod1_alert_rates_cuttoff_perf_obj = performance(mod1_prediction_obj, 'rpp')
 #perf <- performance(pred,"rpp")
 mod1_alert_rates_cuttoffs <- data.table(rpp = mod1_alert_rates_cuttoff_perf_obj@y.values[[1]]
                                         , cutoff = mod1_alert_rates_cuttoff_perf_obj@x.values[[1]])
+mod_all_alert_rates_cuttoffs <- data.table(rpp = mod_all_alert_rates_cuttoff_perf_obj@y.values[[1]]
+                                        , cutoff = mod_all_alert_rates_cuttoff_perf_obj@x.values[[1]])
 
 
 cutoff_ar_01 = mod1_alert_rates_cuttoffs[rpp < 0.01, min(cutoff)]
+cutoff_ar_01_mod_all = mod_all_alert_rates_cuttoffs[rpp < 0.01, min(cutoff)]
+cutoff_ar_02_mod_all = mod_all_alert_rates_cuttoffs[rpp < 0.02, min(cutoff)]
+cutoff_ar_03_mod_all = mod_all_alert_rates_cuttoffs[rpp < 0.03, min(cutoff)]
+
+
 coords(roc_obj_mod1
        , x = cutoff_ar_01
        , ret = c("threshold", "sens", "ppv", 'spec'))
@@ -722,15 +818,7 @@ smaller_tune_grid <- expand.grid(nrounds = c(1000), #seq(from = 10, to = 1000, b
                          colsample_bytree = c(0.7),     # subsample ratio of columns (adds randomness)    
                          min_child_weight = 1,                         
                          subsample = c(0.5)             # subsample percentage (adds randomness)
-                     )
-another_tune_grid <- expand.grid(nrounds = c(700, 900)                #seq(from = 10, to = 1000, by = 100),  # boosting iterations
-                      , max_depth = c(3, 5, 7)                # (controls model complexity)                  ## Reduced according to Hastie's guidelines
-                      , eta = c(1, 6)*0.01                    # step size/learning rate (caret's documentation calls this shrinkage?)
-                      , gamma = c(0, c(1)*0.01)               # min loss reduction (controls model complexity)                      
-                      , colsample_bytree = c(0.6, 0.8)        # subsample ratio of columns (adds randomness)                      
-                      , min_child_weight = c(1, 4)         # minimum sum of instance weight (controls model complexity)
-                      , subsample = c(0.5, 0.8)               # subsample percentage (adds randomness) . Friedman[3] obtained that {\displaystyle 0.5\leq f\leq 0.8} {\displaystyle 0.5\leq f\leq 0.8} leads to good results for small and moderate sized training sets
-)           
+                     )          
 # Let sg indicate small tuning grid.
 tune_grid <- expand.grid(nrounds = c(700, 900)                #seq(from = 10, to = 1000, by = 100),  # boosting iterations
                       , max_depth = c(3, 5, 9)                # (controls model complexity)                  ## Reduced according to Hastie's guidelines
@@ -740,13 +828,6 @@ tune_grid <- expand.grid(nrounds = c(700, 900)                #seq(from = 10, to
                       , min_child_weight = c(0, 1)         # minimum sum of instance weight (controls model complexity)
                       , subsample = c(0.5, 0.8)               # subsample percentage (adds randomness) . Friedman[3] obtained that {\displaystyle 0.5\leq f\leq 0.8} {\displaystyle 0.5\leq f\leq 0.8} leads to good results for small and moderate sized training sets
 ) 
-tune_grid_24 = expand.grid(nrounds = c(100, 500, 1000),
-                         max_depth = c(4, 7),
-                         eta = c(0.01, 0.05),             
-                         gamma = 0,              # default
-                         colsample_bytree = 0.8,   #?? default   
-                         min_child_weight = 1,   # default                         
-                         subsample = c(0.7)) 
 ######################################################################################################
 ##  Train models 
 ######################################################################################################

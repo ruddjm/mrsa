@@ -31,7 +31,7 @@ uatConnection = odbcConnect("UAT", uid="joann_alvarez", pwd="ChangeMe2017", beli
 # For *training,* need to only get patients who have already been discharged and had a chance to get all dxs coded, so they have the outcome.
 #
 date_lb = "'2016-01-01 00:00:00'"
-date_ub = "'2017-11-01 00:00:00'"
+date_ub = "'2017-12-01 00:00:00'"
 whereClause = paste(" (emergency_room_flg = 1 or ip_encounters = 1)
   and age >= 18
   and discharge_dt >= ",
@@ -51,7 +51,6 @@ whereClause = paste(" (emergency_room_flg = 1 or ip_encounters = 1)
 # (powerchart_flg = 1
 #   or powerchart_flg is NULL
 #   or (powerchart_flg = 0 and contributor_system <> 'PowerChart'))
-
 
 facility_filter = 
    " facility_type_cd_desc = 'Acute'
@@ -136,6 +135,11 @@ mainQuery = paste(
   , srg9_desc
   , do_not_resuscitate_ind -- missing for half
   , admit_type
+  , longitude
+  , latitude
+  , regn_nm
+  , licensed_bed_count
+  , sub_mrkt_nm
   , case 
       when lower(ub_admit_source_desc) in ('transfer from hospital', 'transfer from a hospital') 
       then 'hospital transfer'
@@ -322,10 +326,8 @@ dim(mainDat)
 # 148,000 for jan 2018
 # 548,000 for 4 months.
 mainDat[ , age := as.numeric(age)]
+mainDat[ , licensed_bed_count := as.numeric(licensed_bed_count)]
 mainDat[tolower(sex_cd) == "u", sex_cd := NA]
-# Convert hub number back to categorical
-mainDat[ , health_system_source_id := factor(health_system_source_id)]
-
 
 # Make an interaction term between ed flag and ip flag
 mainDat[ip_encounters == 1 & emergency_room_flg == 0, encounter_ed_ip := 'ip_not_through_ed']
@@ -726,11 +728,6 @@ main_w_prev_enc[is.na(last_ip_los), last_ip_los := 0]
 
 
 
-fnamee = paste('../data/saved_R_workspaces_or_objects/key_datatables_end_of_dataManipulation_', substr(date_lb, 2, 11), "_", substr(date_ub, 2, 11), '.Rdata', sep = "")
-
-save(mainDat, date_lb, date_ub, encounter_lev_prev_encounters, mainDatInit, main_w_orders, main_w_prev_enc, ordersDat, file = fnamee)
-
-
 
 
 
@@ -782,46 +779,160 @@ save(mainDat, date_lb, date_ub, encounter_lev_prev_encounters, mainDatInit, main
 # In terms of determining whether someone is in trauma vs medical vs surgical, a good way to handle it may be current location. 
 
 
- # take info from locations within the 1st 24 hours, and see (1) if they were in a trauma ward.
+# take info from locations within the 1st 24 hours, and see (1) if they were in a trauma ward.
 # For "current location," in the model development (train/test data), we can use current location at 24 hours after presentation. For production, we would use current time.
 ##!! Still need to take the last observation.
-current_location = 
+location_query = 
 paste(
 "select 
-  fact_encounter.facility_cd||':'||fact_encounter.patient_account_nbr as encounter_id      -- This is the index encounter.
-  , fact_clinical_location.med_service as current_location_24_hrs      
-  , fact_clinical_location.critical_care as in_critical_care_now 
-  ,
+  distinct
+  fact_encounter.facility_cd||':'||fact_encounter.patient_account_nbr as encounter_id
+  , admission_dt + admission_tm as admit_ts
+  , ed_arrival_ts
+  , case when ed_arrival_ts is not null then min(admit_ts, ed_arrival_ts) else admit_ts end as presentation_time  
+  , round(months_between (admit_ts, date_of_birth)/12, 1) as age
+  , lower(three_hour_loc.medical_service) as location_at_3_hours      
+  , three_hour_loc.critical_care_flg as in_critical_care_at_3_hours 
   
+  , lower(first_location) as first_location
+  , first_location_critical_care
+  , first_location_start_ts
   
-  from fact_encounter
+  from idm..fact_encounter
     left join idm..dim_facility
       on dim_facility.facility_cd = fact_encounter.facility_cd
-    left join idm..fact_clinical_location
-      on fact_encounter.facility_cd = fact_clinical_location.facility_cd
-      and fact_encounter.patient_account_nbr = fact_clinical_location.patient_account_nbr      
+    left join idm..dim_patient
+      on dim_patient.dim_patient_sk = fact_encounter.dim_patient_sk      
+    left join (
+      select * from ( 
+        select
+          facility_cd
+          , patient_account_nbr
+          , start_ts as first_location_start_ts
+          , lower(medical_service) as first_location
+          , critical_care_flg as first_location_critical_care
+          , row_number() over (partition by facility_cd, patient_account_nbr order by start_ts asc nulls last) as start_ts_rank
+        from idm..fact_clinical_location
+        
+        ) fff where start_ts_rank = 1
+        ) first_loc
+      on fact_encounter.facility_cd = first_loc.facility_cd
+      and fact_encounter.patient_account_nbr = first_loc.patient_account_nbr      
       
-      
-      
-    group by fact_clinical_location.facility_cd||':'||fact_clinical_location.patient_account_nbr
-    having fact_clinical_location.start_ts < admit_dt_tm + cast(24||' Hour' as interval)
-      and fact_clinical_location.end_ts < admit_dt_tm + cast(24||' Hour' as interval)              
+    left join idm..fact_clinical_location three_hour_loc
+      on fact_encounter.facility_cd = three_hour_loc.facility_cd
+      and fact_encounter.patient_account_nbr = three_hour_loc.patient_account_nbr  
 
-    where
+    -- Get hospital, pat number, and ed arrival time
+    left join (
+      select * from (
+        select 
+            lvl1_hosp_cd
+          , patient_account_nbr
+          , arr_dt as ed_arrival_ts
+          , row_number() over (partition by lvl1_hosp_cd, patient_account_nbr order by arr_dt asc nulls last) as arr_dt_rank
+        from dmor..emrgncy_dept
+          join dmor..dim_fac using (dim_fac_key)
+        where 
+          ed_arrival_ts is not NULL
+        ) f where arr_dt_rank = 1
+      ) emergency_dept
+      on fact_encounter.facility_cd = emergency_dept.lvl1_hosp_cd
+      and fact_encounter.patient_account_nbr = emergency_dept.patient_account_nbr      
+      
+  where
     
     ",
   whereClause, 
   " and ",
   facility_filter,
   " and (powerchart_flg = 1
-  or powerchart_flg is NULL
-  or (powerchart_flg = 0 and contributor_system <> 'PowerChart'))
+  --or powerchart_flg is NULL
+  --or (powerchart_flg = 0 and contributor_system <> 'PowerChart')
+  )
  
-  --and
-  --fact_clinical_location.start_ts < admit_dt_tm + cast(24||' Hour' as interval)
-  --and fact_clinical_location.end_ts < admit_dt_tm + cast(24||' Hour' as interval)              
-  
+  and three_hour_loc.start_ts < presentation_time + cast(3||' Hour' as interval)
+  and three_hour_loc.end_ts > presentation_time + cast(3||' Hour' as interval)              
   ;")
+
+
+ss = Sys.time()
+location_dat <- data.table(sqlQuery(makoConnection, 
+  location_query, 
+  as.is = TRUE))
+Sys.time() - ss
+dim(location_dat)
+
+setnames(location_dat, names(location_dat), tolower(names(location_dat)))
+
+location_dat[ , trauma_ward_by_3_hours := as.numeric(grepl('trauma', first_location) | grepl('trauma', location_at_3_hours))]
+location_dat[ , ob_location_by_3_hours := as.numeric(grepl('obstetrics|labor', first_location) | grepl('obstetrics|labor', location_at_3_hours))]
+location_dat[ , surg_location_by_3_hours := as.numeric(grepl('surgical|cardiac surg|surg/inv diag|surg/diag obs', first_location) | grepl('surgical|cardiac surg|surg/inv diag|surg/diag obs', location_at_3_hours))]
+location_dat[ , rehab_by_3_hours := as.numeric(grepl('rehab', first_location) | grepl('rehab', location_at_3_hours))]
+
+
+
+main_w_prev_enc = merge(main_w_prev_enc
+      , location_dat[!duplicated(encounter_id), .(encounter_id, first_location, location_at_3_hours, in_critical_care_at_3_hours, trauma_ward_by_3_hours, rehab_by_3_hours, surg_location_by_3_hours, ob_location_by_3_hours)]
+      , by = "encounter_id"
+      , all.x = TRUE
+      , all.y = FALSE)
+
+main_w_prev_enc[is.na(in_critical_care_at_3_hours), in_critical_care_at_3_hours := -9999]
+main_w_prev_enc[is.na(trauma_ward_by_3_hours), trauma_ward_by_3_hours := -9999]
+main_w_prev_enc[is.na(rehab_by_3_hours), rehab_by_3_hours := -9999]
+main_w_prev_enc[is.na(surg_location_by_3_hours), surg_location_by_3_hours := -9999]
+main_w_prev_enc[is.na(ob_location_by_3_hours), ob_location_by_3_hours := -9999]
+
+
+# There are about 700 extra rows that I wasn't expecting. I expected unique rows.
+# Could we use oncology as a location?
+# 95 - SNF/Extended Care n = 
+# What is
+# non-obsv op in bed
+
+
+
+
+
+
+fnamee = paste('../data/saved_R_workspaces_or_objects/key_datatables_end_of_dataManipulation_', substr(date_lb, 2, 11), "_", substr(date_ub, 2, 11), '.Rdata', sep = "")
+
+save(mainDat, date_lb, date_ub, encounter_lev_prev_encounters, main_w_orders, main_w_prev_enc, ordersDat, location_dat, file = fnamee)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -956,13 +1067,7 @@ mainDat[mrsa_carrier == 1,
 # Once you have final feature list, turn eta down to  0.001- 0.1 to improve model auc. 0.1 works fine and is fast enough.
 
 if(FALSE){
-# xgboost fitting with arbitrary parameters
-xgb_params_1 = list(
-  objective = "binary:logistic",                                               # binary classification
-  eta = 0.1,                                                                  # learning rate
-  max.depth = 3,                                                               # max tree depth
-  eval_metric = "auc",                                                          # evaluation/loss metric
-  subsample=0.3)
+
 
 set.seed(1234)
 xgb_cv_1 = xgb.cv(params = xgb_params_1,

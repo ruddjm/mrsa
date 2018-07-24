@@ -320,27 +320,65 @@ Prevalence
 0.03\%
 \end{frame}
 
+\section{Machine Learning Algorithm}
+
+
+
+
+
+
+
+
+
+
+
+\section{Model Tuning}
+
+
+
+
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+\section{Variable Importance}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Choosing Threshold}
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Alert Rate}
+
+
 \begin{frame}{Alert rate}
 
+
+
+
 \end{frame}
+
+
+
+\begin{frame}{Cutoffs at different alert rates}
+
+\end{frame}
+
+
+
+\begin{frame}{Performance at different alert rates and times}
+
+\end{frame}
+
+
 
 
 
@@ -352,7 +390,6 @@ Prevalence
 %% 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Choosing Threshold}
 
 
 
@@ -371,8 +408,6 @@ If the model were well calibrated, we could just use the alert rate we wanted as
 
 \end{frame}
 
-
-\section{Model Tuning}
 
 
 
