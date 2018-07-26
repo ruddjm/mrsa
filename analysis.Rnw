@@ -139,12 +139,23 @@ library(data.table)
 \end{frame}
 
 \begin{frame}{Project Goal}
-Goal: Flag patients who are likely to have/acquire MRSA
-Use case: Implement a near continuously updating EHR alert.
+Task: Flag patients who are likely to have/acquire MRSA\\
+% develop a machine learning model to...
+
+\bigskip
+\bigskip
+\bigskip
+\pause
+Use case: Implement a realtime alert through the EHR.
 %hourly
 
 % Explain "decision support"
 \end{frame}
+
+%
+% This is a work in progress! I'm still in the model building phase.
+%
+
 
 \section{Background}
 
@@ -152,41 +163,60 @@ Use case: Implement a near continuously updating EHR alert.
 
 \begin{frame}[fragile]{What is MRSA?}
 
-Methicillin-resistant Staphylococcus aureus
+Methicillin-resistant \emph{Staphylococcus aureus}\\
+% staph is a bacteria
 % MRSA is a staph infection that doesn't respond to certain antibiotics
-
-Hospital- and community- acquired
-% Often developed in hospital and can also be contracted in the community
+\bigskip
+\bigskip
+\bigskip
+Exists because of bacteria's evolution to survive different antibiotics\\
+\bigskip
+\bigskip
+\bigskip
+\pause
+80,000 life-threatening cases per year in US. 
 \end{frame}
 
-\begin{frame}
-staph is a bacteria
-many people have staph on skin or in nose.
-Some people 'carry' mrsa
-mrsa exists because of bacteria's evolution to survive different antibiotics
-hospital acquired and community acquired.
-diagnosed by a lab test
 
-when a CA infection is localized to the skin or soft tissue, can be treated.
-Can spread to blood and internal organs and cause sepsis.
-Spreads betweeen patients and providers.
-diagnosed by blood culture and microbiology or PCR, which can detect mrsa dna.
-about 80k life-threatening cases per year in US. 
+\begin{frame}
+Many people have staph on skin or in nose.\\
+Some people 'carry' MRSA\\
+% called carriers
+
+Hospital- and community- acquired\\
+% Often contracted in hospital and can also be contracted in the community
+Spreads betweeen patients and providers.\\
+% handwashing protocols
+
+Diagnosed by a lab test\\
+%diagnosed by blood culture and microbiology or PCR, which can detect mrsa dna.
+
+When an infection is localized to the skin or soft tissue, can be treated more easily.\\
+Can spread to blood and internal organs and cause sepsis.\\
+
+
+
 \end{frame}
 
 
 \begin{frame}{Human and Financial Costs of MRSA}
-\noindent Human and Financial Costs of MRSA
-Cost of mrsa
-infections can spread and become life threatening.
-people die
 
-costs hospitals lots of money
-face liability
-lose insurance reimbursements
-impacts hospital quality ratings.
-Hospitals are required to report to CMS and to some states require
-CMS reduces payment if the infection is preventable or if the hospital has high MRSA rates.
+\bigskip
+\bigskip
+\bigskip
+\noindent Infections can spread and become life threatening.\\
+Patients die\\
+
+Costs hospitals lots of money
+\begin{itemize}
+\item Liability
+\item Lose insurance reimbursements
+\item Impacts hospital quality ratings
+\item Hospitals are required to report to CMS and to the government in some states
+\item CMS reduces payment if the infection is preventable or if the hospital has high MRSA rates.
+\end{itemize}
+% These mainly focus on hospital acquired MRSA. For community acquired, the faster the infection is diagnosed and treated, the less the encounter will cost.
+
 \end{frame}
 
 
@@ -194,36 +224,33 @@ CMS reduces payment if the infection is preventable or if the hospital has high 
 Hospitals develop protocols
 screen to identify carriers.
   nasal swab.
+% especially in ICU 
   
-  prevent spread via handwashing, keep wounds clean and covered
-
-  isolate patients
+Prevent spread
+\begin{itemize}
+\item handwashing
+\item keep wounds clean and covered
+\item isolate patients
+\end{itemize}
 \end{frame}
 
 
 
 \begin{frame}{Treatment}
-Tx
-  urgent
-  give oral or iv antibiotics
-  there are different tiers of abx that strains of mrsa are successively resistant to. 
+
+Urgent\\
+  Oral or IV antibiotics\\
+  There are different tiers of abx that strains of MRSA are successively resistant to.\\ 
+  % like an arms race
   vancomycin and teicoplanin are used 
   daptomycin when it's resistant to others.
   linezolid
 \end{frame}
 
-\begin{frame}{Project Goal}
-Goal: Flag patients who are likely to have/acquire MRSA
-Use case: Implement a near continuously updating EHR alert.
-%hourly
-
-% Explain "decision support"
-
-% Discussed this with ___.
-\end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Data Acquisition}
+\section{Data}
+\subsection{Data Acquisition}
 \begin{frame}{Data Acquisition}
 
 Cerner EHR $\rightarrow$ integrated data mart
@@ -252,8 +279,13 @@ Cerner EHR $\rightarrow$ integrated data mart
       \item gender
       \item marital status
       \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Available Data}
+   \begin{itemize}
    \item diagnoses
-   % hundreds
+   % hundreds for a single encounter
    \item labs
    \item vital signs
    \item medications administered
@@ -269,12 +301,12 @@ Cerner EHR $\rightarrow$ integrated data mart
    \end{itemize}
 \end{frame}
 
-
-
 \begin{frame}{Data Acquisition}
 Identifed training cases
-
-Used diagnoses codes. 
+\bigskip
+\bigskip
+\bigskip
+Used diagnosis codes. 
 % There are 10s of thousands of codes . used 4
 % international classification of disease codes
 \begin{itemize}
@@ -285,7 +317,7 @@ Used diagnoses codes.
 \end{itemize}
 
 
-Would like to supplement with microbiology lab data, but are still working on connecting the data systems.
+%Would like to supplement with microbiology lab data, but are still working on connecting the data systems.
 \end{frame}
 
 
@@ -298,41 +330,77 @@ Would like to supplement with microbiology lab data, but are still working on co
 
 
 
-\section{Feature Engineering}
+\subsection{Feature Engineering}
+
+
+\begin{frame}{Features}
+Started with those recommended by infection control person
+
+\pause
+\begin{itemize}
+\item Nursing home patients
+\item Immunocompromised
+% transplant, cancer, HIV
+\item Any access to the body such as central line or catheter
+\item Recent hospital visits
+\end{itemize}
+\end{frame}
 
 
 
+\begin{frame}{Features}
+Labs and vitals
+
+\pause
+\begin{itemize}
+\item %Nursing home patients
+\item %Immunocompromised
+% transplant, cancer, HIV
+\item %Any access to the body such as central line or catheter
+\item %Recent hospital visits
+\end{itemize}
+\end{frame}
 
 
+\begin{frame}{Challenges}
 
+Dependence on past visits
+patients cannot be identified if they went to a different hospital (within or outside Tenet)
 
+Very low prevalence
 
+\end{frame}
 
-
-
-
-
-\section{Data Description}
+\subsection{Data Description}
 
 \begin{frame}[fragile]
 Prevalence
 
 0.03\%
+
+$~10000$ cases over about 2 years
+% hospital or community acquired?
 \end{frame}
 
 \section{Machine Learning Algorithm}
 
 
+\begin{frame}{}
+xgboost
+
+\end{frame}
+
+
+\begin{frame}{Variable Importance}
+
+
+\end{frame}
 
 
 
 
 
-
-
-
-
-\section{Model Tuning}
+\subsection{Model Tuning}
 
 
 
@@ -344,14 +412,12 @@ Prevalence
 %% 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Variable Importance}
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Choosing Threshold}
+\subsection{Choosing Threshold}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -361,7 +427,8 @@ Prevalence
 
 \begin{frame}{Alert rate}
 
-
+``Alert fatigue"
+Want a very low alert rate because event very rare 
 
 
 \end{frame}
@@ -399,7 +466,6 @@ Prevalence
 
 
 \begin{frame}
-If the model were well calibrated, we could just use the alert rate we wanted as the cut off.
 
 
 
@@ -416,35 +482,7 @@ Appendix
 \end{frame}
 
 
-\begin{frame}[fragile]
-Used second half of 2017 to investigate relationships\\
-\bigskip
-\bigskip
-\bigskip
-\bigskip
-Overall readmission rate for second half of 2017: 
-\end{frame}
 
-
-
-\begin{frame}[fragile]{Adjustment for Index Condition}
-Adjusted for index condition using second half of 2016 as reference
-\end{frame}
-
-
-
-
-\begin{frame}[fragile]
-Overall readmission rate for second half of 2017: \\
-  
-\bigskip
-\bigskip
-\bigskip
-\bigskip
-Adjusted for index condition: 
-
-
-\end{frame}
 
 
 
