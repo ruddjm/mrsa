@@ -162,15 +162,12 @@ Use case: Implement a realtime alert through the EHR.
 
 
 \begin{frame}[fragile]{What is MRSA?}
-
 Methicillin-resistant \emph{Staphylococcus aureus}\\
 % staph is a bacteria
 % MRSA is a staph infection that doesn't respond to certain antibiotics
 \bigskip
 \bigskip
-\bigskip
 Exists because of bacteria's evolution to survive different antibiotics\\
-\bigskip
 \bigskip
 \bigskip
 \pause
@@ -178,36 +175,30 @@ Exists because of bacteria's evolution to survive different antibiotics\\
 \end{frame}
 
 
-\begin{frame}
+\begin{frame}{What is MRSA?}
 Many people have staph on skin or in nose.\\
-Some people 'carry' MRSA\\
 % called carriers
-
-Hospital- and community- acquired\\
+\pause
+Hospital- or community- acquired\\
 % Often contracted in hospital and can also be contracted in the community
 Spreads betweeen patients and providers.\\
-% handwashing protocols
-
-Diagnosed by a lab test\\
-%diagnosed by blood culture and microbiology or PCR, which can detect mrsa dna.
-
-When an infection is localized to the skin or soft tissue, can be treated more easily.\\
-Can spread to blood and internal organs and cause sepsis.\\
-
-
-
 \end{frame}
 
 
-\begin{frame}{Human and Financial Costs of MRSA}
+\begin{frame}{Human Costs of MRSA}
+\begin{itemize}
+\item If infection localized to skin or soft tissue, can be treated more easily
+\item Can spread to blood and internal organs
+\item Patients die
+\end{itemize}
+\end{frame}
 
-\bigskip
-\bigskip
-\bigskip
-\noindent Infections can spread and become life threatening.\\
-Patients die\\
 
-Costs hospitals lots of money
+\begin{frame}{Financial Costs}
+Costs hospitals lots of money\\
+\bigskip
+\pause
+Hospital acquired:
 \begin{itemize}
 \item Liability
 \item Lose insurance reimbursements
@@ -215,17 +206,30 @@ Costs hospitals lots of money
 \item Hospitals are required to report to CMS and to the government in some states
 \item CMS reduces payment if the infection is preventable or if the hospital has high MRSA rates.
 \end{itemize}
-% These mainly focus on hospital acquired MRSA. For community acquired, the faster the infection is diagnosed and treated, the less the encounter will cost.
-
+\pause
+Community acquired:
+\begin{itemize}
+\item Can save money with faster diagnosis and treatment
+\end{itemize}
 \end{frame}
 
 
-\begin{frame}
+
+
+%diagnosed by blood culture and microbiology or PCR, which can detect mrsa dna.
+
+
+
+
+
+\begin{frame}{MRSA protocols}
 Hospitals develop protocols
-screen to identify carriers.
-  nasal swab.
+\begin{itemize}
+\item Screen to identify carriers.
 % especially in ICU 
-  
+\item Decolonization 
+\end{itemize}
+
 Prevent spread
 \begin{itemize}
 \item handwashing
@@ -237,14 +241,11 @@ Prevent spread
 
 
 \begin{frame}{Treatment}
-
-Urgent\\
+  Urgent\\
   Oral or IV antibiotics\\
   There are different tiers of abx that strains of MRSA are successively resistant to.\\ 
   % like an arms race
-  vancomycin and teicoplanin are used 
-  daptomycin when it's resistant to others.
-  linezolid
+  vancomycin, teicoplanin, daptomycin, linezolid
 \end{frame}
 
 
@@ -335,31 +336,87 @@ Used diagnosis codes.
 
 \begin{frame}{Features}
 Started with those recommended by infection control person
-
 \pause
 \begin{itemize}
 \item Nursing home patients
 \item Immunocompromised
 % transplant, cancer, HIV
 \item Any access to the body such as central line or catheter
-\item Recent hospital visits
+\item On Dialysis
 \end{itemize}
 \end{frame}
 
 
 
 \begin{frame}{Features}
-Labs and vitals
-
+Location within hospital
 \pause
 \begin{itemize}
-\item %Nursing home patients
-\item %Immunocompromised
-% transplant, cancer, HIV
-\item %Any access to the body such as central line or catheter
-\item %Recent hospital visits
+\item Surgery
+\item Trauma
+\item Obstetrics
+\item Rehab
 \end{itemize}
 \end{frame}
+
+
+
+\begin{frame}{Features}
+Prior hospital/ED visits
+\pause
+\begin{itemize}
+\item Number of visits in last year
+\item Time since last visit (inpatient, ED, ICU)
+\item Length of stay at last visit
+\end{itemize}
+\end{frame}
+
+
+
+
+
+\begin{frame}{Features}
+Labs and vitals
+\pause
+\begin{itemize}
+\item White blood cell count
+\item Height, weight, BMI
+\item Lactic acid
+\item Age
+\item Shock index by age: (HR/SBP) * Age
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Features}
+Words in 'Reason for visit'
+\pause
+\begin{itemize}
+\item Cellulitis
+\item Abscess
+\item Sepsis
+\end{itemize}
+\end{frame}
+
+
+
+
+\begin{frame}{Features}
+More features:
+\pause
+\begin{itemize}
+\item Hospital's bed count
+\item Hospital region
+\item Patient's ED arrival method
+\item Time since admission
+\end{itemize}
+\end{frame}
+
+
+
+
+
+
 
 
 \begin{frame}{Challenges}
@@ -369,6 +426,7 @@ patients cannot be identified if they went to a different hospital (within or ou
 
 Very low prevalence
 
+Time!!
 \end{frame}
 
 \subsection{Data Description}
@@ -379,20 +437,31 @@ Prevalence
 0.03\%
 
 $~10000$ cases over about 2 years
-% hospital or community acquired?
+Mostly community acquired
 \end{frame}
 
 \section{Machine Learning Algorithm}
 
 
 \begin{frame}{}
-xgboost
+xgboost!\\
+\bigskip
 
+\pause
+R packages:
+\pause
+\begin{itemize}
+\item xgboost
+\item caret
+\item recipes
+\item mlr
+\end{itemize}
 \end{frame}
 
 
 \begin{frame}{Variable Importance}
 
+\centerline{\includegraphics[width=1.2\textwidth]{var_imp_all.pdf}}
 
 \end{frame}
 
