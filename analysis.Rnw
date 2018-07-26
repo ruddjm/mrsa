@@ -421,23 +421,30 @@ More features:
 
 \begin{frame}{Challenges}
 
-Dependence on past visits
-patients cannot be identified if they went to a different hospital (within or outside Tenet)
-
 Very low prevalence
+\bigskip
+\pause
+Dependence on past visits which are often not observable
 
-Time!!
+\bigskip
+\pause
+Patients cannot be identified if they went to a different hospital (within or outside Tenet)
+
+\bigskip
+\pause
+
+Complexities with time
 \end{frame}
 
 \subsection{Data Description}
 
-\begin{frame}[fragile]
-Prevalence
-
-0.03\%
-
-$~10000$ cases over about 2 years
-Mostly community acquired
+\begin{frame}{Data Description}
+\begin{itemize}
+\item Identified 3,000,000 inpatient/ED encounters
+\item $\~10000$ MRSA cases over about 2 years\\
+\item Prevalence: 0.3\%
+\item Mostly community acquired
+\end{itemize}
 \end{frame}
 
 \section{Machine Learning Algorithm}
@@ -472,11 +479,31 @@ R packages:
 \subsection{Model Tuning}
 
 
+\begin{frame}{Tuning}
 
+xgboost tuning parameters:
 
+\begin{itemize}
+\item Learning rate/shrinkage
+\pause
+\item Number of boosting rounds
+\pause
+\item Maximum tree depth
+\pause
+\item Fraction of observations to subsample
+\pause
+\item Fraction of features to subsample
+\end{itemize}
 
+\end{frame}
 
+\begin{frame}{Effects of tuning parameters}
+\centerline{\includegraphics[width=1.2\textwidth]{tuning_eta_nrounds.pdf}}
+\end{frame}
 
+\begin{frame}{Effects of tuning parameters}
+See figure 
+\end{frame}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -510,8 +537,21 @@ Want a very low alert rate because event very rare
 
 
 
-\begin{frame}{Performance at different alert rates and times}
-
+\begin{frame}[fragile]{Performance at different alert rates and times}
+<<results='asis'>>=
+perf = data.table(
+   'Alert Rate' = c('1\\%', '2\\%', '3\\%'),
+   'Cutoff' = c(0.049, 0.026, 0.017),
+   'PPV' = c(0.09, 0.07, 0.05),
+   'Sensitivity' = c(0.26, 0.42, 0.50),
+   'Specificity' = c(0.99, 0.98, 0.97))
+latex(perf,
+  title = '',
+  booktabs = FALSE,
+  rowname = NULL,
+  caption = "Performance at selected alert rates",
+  file = '')   
+@
 \end{frame}
 
 
