@@ -303,11 +303,11 @@ Cerner EHR $\rightarrow$ integrated data mart
 \end{frame}
 
 \begin{frame}{Data Acquisition}
-Identifed training cases
+Identifed training cases\\
 \bigskip
 \bigskip
 \bigskip
-Used diagnosis codes. 
+Used ICD 10 diagnosis codes. 
 % There are 10s of thousands of codes . used 4
 % international classification of disease codes
 \begin{itemize}
@@ -342,7 +342,7 @@ Started with those recommended by infection control person
 \item Immunocompromised
 % transplant, cancer, HIV
 \item Any access to the body such as central line or catheter
-\item On Dialysis
+\item On dialysis
 \end{itemize}
 \end{frame}
 
@@ -413,7 +413,16 @@ More features:
 \end{frame}
 
 
-
+\begin{frame}{Preprocessing}
+Used \texttt{recipes} R package
+\pause
+\begin{itemize}
+\item Impute missing numeric with extreme value
+\item Impute missing factors with mode 
+\item One-hot encode
+\item Create extra categories for new, unseen values.
+\end{itemize}
+\end{frame}
 
 
 
@@ -421,19 +430,19 @@ More features:
 
 \begin{frame}{Challenges}
 
-Very low prevalence
+Very low prevalence\\
 \bigskip
 \pause
-Dependence on past visits which are often not observable
+Dependence on past visits which are often not observable\\
 
 \bigskip
 \pause
-Patients cannot be identified if they went to a different hospital (within or outside Tenet)
+Patients cannot be identified if they went to a different hospital (within or outside Tenet)\\
 
 \bigskip
 \pause
 
-Complexities with time
+Complexities with time\\
 \end{frame}
 
 \subsection{Data Description}
@@ -441,11 +450,26 @@ Complexities with time
 \begin{frame}{Data Description}
 \begin{itemize}
 \item Identified 3,000,000 inpatient/ED encounters
-\item $\~10000$ MRSA cases over about 2 years\\
+\item 10,000 MRSA cases over about 2 years\\
 \item Prevalence: 0.3\%
 \item Mostly community acquired
 \end{itemize}
 \end{frame}
+
+
+
+\begin{frame}{Relationship with Age}
+
+\centerline{\includegraphics[width=1.0\textwidth]{age_by_mrsa.pdf}}
+
+\end{frame}
+\begin{frame}{Relationship with Weight}
+
+\centerline{\includegraphics[width=1.0\textwidth]{weight_by_mrsa.pdf}}
+
+\end{frame}
+
+
 
 \section{Machine Learning Algorithm}
 
@@ -498,7 +522,7 @@ xgboost tuning parameters:
 \end{frame}
 
 \begin{frame}{Effects of tuning parameters}
-\centerline{\includegraphics[width=1.2\textwidth]{tuning_eta_nrounds.pdf}}
+\centerline{\includegraphics[width=1.0\textwidth]{tuning_eta_nrounds.pdf}}
 \end{frame}
 
 \begin{frame}{Effects of tuning parameters}
@@ -531,9 +555,6 @@ Want a very low alert rate because event very rare
 
 
 
-\begin{frame}{Cutoffs at different alert rates}
-
-\end{frame}
 
 
 
@@ -559,36 +580,20 @@ latex(perf,
 
 
 
-
-\begin{frame}
+\begin{frame}{Next Steps}
+\begin{itemize}
+\item Tuning!
+\item Previous antibiotic exposure
+\item Find evidence of wound
+\item Try some interactions with whether came through ED
+\item Expand data
+\end{itemize}
 \end{frame}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-
-
-
-
-
-
-
-\begin{frame}
-
-
-
-
-
-
-\end{frame}
-
-
-
-
-\begin{frame}
-Appendix
-\end{frame}
 
 
 
